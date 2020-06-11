@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"api_exporter/utils"
 	"bufio"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
@@ -59,7 +60,8 @@ func (c *accessCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (c *accessCollector) analysisAccessLog(filePath string) map[string]float64 {
 
-	analysisResult := make(map[string]float64)
+	totalResult := make(map[string][]float64)
+	avgResult := make(map[string]float64)
 
 	file, err := os.Open(filePath)
 
@@ -77,11 +79,32 @@ func (c *accessCollector) analysisAccessLog(filePath string) map[string]float64 
 
 	for line.Scan() {
 		slice := strings.Split(line.Text(), " ")
-		analysisResult[slice[6]], err = strconv.ParseFloat(slice[len(slice)-1], 64)
+
+		url := slice[6]
+		state := slice[8]
+		timeStr := slice[len(slice)-1]
+
+		slice = strings.Split(url, "?")
+		api := slice[0]
+
+		time, err := strconv.ParseFloat(timeStr[1:len(timeStr)-1], 64)
+
+		if state == "200" && api[0] == '/' {
+
+			if len(api) > 6 && api[0:6] == "/image" {
+				api = "/image"
+			}
+
+			totalResult[api] = append(totalResult[api], time)
+		}
 
 		if err != nil {
 			//TODO 字符串转float异常处理
 		}
+	}
+
+	for api, total := range totalResult {
+		avgResult[api] = utils.Round(utils.Avg(total), 3)
 	}
 
 	err = line.Err()
@@ -90,5 +113,5 @@ func (c *accessCollector) analysisAccessLog(filePath string) map[string]float64 
 		//TODO 文件读取行异常处理
 	}
 
-	return analysisResult
+	return avgResult
 }

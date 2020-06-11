@@ -1,7 +1,10 @@
 package main
 
 import (
+	"api_exporter/collector"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log2 "github.com/prometheus/common/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"log"
 	"net/http"
@@ -16,7 +19,26 @@ func main() {
 
 	kingpin.Parse()
 
-	http.Handle(*metricsPath, promhttp.Handler())
+	exporter, err := collector.NewAccessCollector(*accessPath)
+
+	if err != nil {
+		//TODO
+	}
+
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(exporter)
+
+	gatherers := prometheus.Gatherers{
+		reg,
+	}
+
+	handler := promhttp.HandlerFor(gatherers,
+		promhttp.HandlerOpts{
+			ErrorLog:      log2.NewErrorLogger(),
+			ErrorHandling: promhttp.ContinueOnError,
+		})
+
+	http.Handle(*metricsPath, handler)
 
 	log.Fatal(http.ListenAndServe(*port, nil))
 
