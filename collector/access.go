@@ -50,7 +50,7 @@ func (c *accessCollector) Collect(ch chan<- prometheus.Metric) {
 	for api, time := range c.analysisAccessLog(c.accessFilePath) {
 		ch <- prometheus.MustNewConstMetric(
 			c.apiResponseDesc,
-			prometheus.CounterValue,
+			prometheus.GaugeValue,
 			time,
 			api,
 		)
