@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 const accessSubsystem = "access"
@@ -47,11 +48,11 @@ func (c *accessCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (c *accessCollector) Collect(ch chan<- prometheus.Metric) {
 
-	for api, time := range c.analysisAccessLog(c.accessFilePath) {
+	for api, consumeTime := range c.analysisAccessLog(c.accessFilePath) {
 		ch <- prometheus.MustNewConstMetric(
 			c.apiResponseDesc,
 			prometheus.GaugeValue,
-			time,
+			consumeTime,
 			api,
 		)
 	}
@@ -83,19 +84,26 @@ func (c *accessCollector) analysisAccessLog(filePath string) map[string]float64 
 		url := slice[6]
 		state := slice[8]
 		timeStr := slice[len(slice)-1]
+		requestTimeStr := slice[3]
+
+		loc, _ := time.LoadLocation("Local")
+		requestTime, _ := time.ParseInLocation("2/Jan/2006:15:04:05", requestTimeStr[1:], loc)
+
+		now := time.Now().Unix()
 
 		slice = strings.Split(url, "?")
 		api := slice[0]
 
-		time, err := strconv.ParseFloat(timeStr[1:len(timeStr)-1], 64)
+		consumeTime, err := strconv.ParseFloat(timeStr[1:len(timeStr)-1], 64)
 
-		if state == "200" && api[0] == '/' {
+
+		if state == "200" && api[0] == '/' && (now-requestTime.Unix() < 3600*24) {
 
 			if len(api) > 6 && api[0:6] == "/image" {
 				api = "/image"
 			}
 
-			totalResult[api] = append(totalResult[api], time)
+			totalResult[api] = append(totalResult[api], consumeTime)
 		}
 
 		if err != nil {
